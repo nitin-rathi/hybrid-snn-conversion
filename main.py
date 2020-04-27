@@ -374,13 +374,13 @@ ann_thresholds = [4.26, 2.87, 0.48, 1.34, 0.21, 0.87, 1.12, 0.17, 1.30, 4.46, 0.
 #VGG5 CIFAR10 thresholds
 #ann_thresholds = [12.70, 1.39, 1.65, 0.17, 0.54]
 
-thresholds_set = model.module.threshold_init(scaling_threshold=scaling_threshold, reset_threshold=reset_threshold, thresholds = ann_thresholds[:], default_threshold=default_threshold)
 
-f.write('\n Threshold: {}'.format(thresholds_set))
 #Uncomment to find firing thresholds
 #if pretrained and find_thesholds:
 #    find_threshold(ann_thresholds, train_loader)
     
+thresholds_set = model.module.threshold_init(scaling_threshold=scaling_threshold, reset_threshold=reset_threshold, thresholds = ann_thresholds[:], default_threshold=default_threshold)
+f.write('\n Threshold: {}'.format(thresholds_set))
 
 for epoch in range(start_epoch, 50):
     
