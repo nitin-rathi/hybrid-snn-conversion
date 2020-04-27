@@ -16,7 +16,7 @@ torch.manual_seed(2)
 cfg = {
 	'VGG5' : [64, 'A', 128, 'D', 128, 'A'],
 	'VGG9': [64, 'A', 128, 'D', 128, 'A', 256, 'D', 256, 'A', 512, 'D', 512, 'D'],
-	'VGG11': [64, 'A', 128, 'D', 256, 'A', 512, 'D', 512, 'D', 512, 'A', 512, 'D', 512, 'D'],
+	'VGG11': [64, 'A', 128, 'D', 256, 'D', 256, 'A', 512, 'D', 512, 'D', 512, 'A', 512, 'D', 512, 'D'],
 	'VGG16': [64, 'D', 64, 'A', 128, 'D', 128, 'A', 256, 'D', 256, 'D', 256, 'A', 512, 'D', 512, 'D', 512, 'A', 512, 'D', 512, 'D', 512, 'D']
 }
 class PoissonGenerator(nn.Module):
@@ -50,6 +50,28 @@ class STDPSpike(torch.autograd.Function):
 		grad = STDPSpike.alpha * torch.exp(-1*last_spike)**STDPSpike.beta
 		return grad*grad_input, None
 
+class LinearSpike(torch.autograd.Function):
+    """
+    Here we use the piecewise-linear surrogate gradient as was done
+    in Bellec et al. (2018).
+    """
+    gamma = 0.3 # Controls the dampening of the piecewise-linear surrogate gradient
+
+    @staticmethod
+    def forward(ctx, input, last_spike):
+        
+        ctx.save_for_backward(input)
+        out = torch.zeros_like(input).cuda()
+        out[input > 0] = 1.0
+        return out
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        
+        input,     = ctx.saved_tensors
+        grad_input = grad_output.clone()
+        grad       = LinearSpike.gamma*F.threshold(1.0-torch.abs(input), 0, 0)
+        return grad*grad_input, None
 
 class VGG_SNN_STDB(nn.Module):
 
@@ -63,7 +85,11 @@ class VGG_SNN_STDB(nn.Module):
 		self.vgg_name 		= vgg_name
 		self.labels 		= labels
 		self.leak_mem 		= leak_mem
-		self.act_func	= STDPSpike.apply
+		if activation=='STDB':
+			self.act_func	= STDPSpike.apply
+		elif activation=='Linear':
+			self.act_func = LinearSpike.apply
+
 		self.input_layer 	= PoissonGenerator()
 				
 		self.features, self.classifier = self._make_layers(cfg[self.vgg_name])

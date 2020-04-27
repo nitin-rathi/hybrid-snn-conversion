@@ -22,11 +22,9 @@ import os
 import shutil
 
 use_cuda = True
-
-#torch.manual_seed(2)
+torch.manual_seed(0)
 if torch.cuda.is_available() and use_cuda:
     print ("\n \t ------- Running on GPU -------")
-    #torch.cuda.set_device(int(sys.argv[1]))
     torch.set_default_tensor_type('torch.cuda.FloatTensor')
 
 
@@ -190,10 +188,10 @@ def test(epoch, loader):
                 'activation'            : activation
             }
         filename = 'snn_'+architecture.lower()+'_'+dataset.lower()+'_'+str(timesteps)+'_'+str(update_interval)+'.pth'
-        torch.save(state,filename)    
+        #torch.save(state,filename)    
         
-        if is_best:
-            shutil.copyfile(filename, 'best_'+filename)
+        #if is_best:
+        #    shutil.copyfile(filename, 'best_'+filename)
 
         f.write('\nTest set: Loss: {:.6f}, Current: {:.2f}%, Best: {:.2f}%\n'.  format(
             total_loss/(batch_idx+1), 
@@ -201,23 +199,22 @@ def test(epoch, loader):
             100. * max_correct.item() / len(test_loader.dataset)
             )
         )
-
-    
+   
 dataset             = 'CIFAR10' # {'CIFAR10', 'CIFAR100', 'IMAGENET'}
 batch_size          = 64
-timesteps           = 200
-update_interval     = 200
+timesteps           = 100
+update_interval     = timesteps
 num_workers         = 4
-leak_mem            = 0.99
+leak_mem            = 1.0 #{0.99, 1.0}
 scaling_threshold   = 0.7
 reset_threshold     = 0.0
 default_threshold   = 1.0
-activation          = 'STDB' # {'Linear', 'STDB'}
+activation          = 'Linear' # {'Linear', 'STDB'}
 architecture        = 'VGG16' # {'VGG5','VGG9','VGG16','RESNET18','RESNET34'}
 print_to_file       = False
 log_file            = 'snn_'+architecture.lower()+'_'+dataset.lower()+'_'+str(timesteps)+'_'+str(update_interval)+'_'+activation.lower()+'.log'
 pretrained          = True
-pretrained_state    = './best_snn_vgg16_cifar10.pth'
+pretrained_state    = '/home/min/a/rathi2/SNN_backprop/trained_models/CIFAR10/SNN/snn_vgg16_cifar10.pth'
 find_thesholds      = False
 freeze_conv         = False
 resume              = False
@@ -233,7 +230,6 @@ if print_to_file:
 else:
     f = sys.stdout
 
-
 normalize       = transforms.Normalize(mean = [0.5, 0.5, 0.5], std = [0.5, 0.5, 0.5])
 transform_train = transforms.Compose([
                      transforms.RandomCrop(32, padding=4),
@@ -243,13 +239,13 @@ transform_train = transforms.Compose([
 transform_test  = transforms.Compose([transforms.ToTensor(), normalize])
 
 if dataset == 'CIFAR10':
-    trainset    = datasets.CIFAR10(root = './cifar_data', train = True, download = True, transform = transform_train)
-    testset     = datasets.CIFAR10(root='./cifar_data', train=False, download=True, transform=                               transform_test)
+    trainset    = datasets.CIFAR10(root = '~/Datasets/cifar_data', train = True, download = True, transform = transform_train)
+    testset     = datasets.CIFAR10(root='~/Datasets/cifar_data', train=False, download=True, transform=                               transform_test)
     labels      = 10
 
 elif dataset == 'CIFAR100':
-    trainset    = datasets.CIFAR100(root = './cifar_data', train = True, download = True, transform = transform_train)
-    testset     = datasets.CIFAR100(root='./cifar_data', train=False, download=True, transform=                               transform_test)
+    trainset    = datasets.CIFAR100(root = '~/Datasets/cifar_data', train = True, download = True, transform = transform_train)
+    testset     = datasets.CIFAR100(root='~/Datasets/cifar_data', train=False, download=True, transform=                               transform_test)
     labels      = 100
 
 elif dataset == 'IMAGENET':
@@ -286,7 +282,7 @@ elif architecture[0:3].lower() == 'res':
 if freeze_conv:
     for param in model.features.parameters():
         param.requires_grad = False
-
+#Please comment this line if you find key mismatch error and uncomment the DataParallel after the if block
 model = nn.DataParallel(model) 
 if pretrained:
         
@@ -312,8 +308,8 @@ if pretrained:
             else:
                 f.write('\n {}: '.format(key))
         model.load_state_dict(state['state_dict'])
-        
-
+    
+#model = nn.DataParallel(model) 
 if torch.cuda.is_available() and use_cuda:
     model.cuda()
 
@@ -370,7 +366,7 @@ if architecture.lower().startswith('res'):
 #ann_thresholds = [8.73, 4.88, 5.80]
 
 #VGG11 CIFAR100 thresholds
-#ann_thresholds = [15.56, 1.79, 3.51, 0.79, 1.04, 1.29, 0.22, 1.27, 0.62, 1.29]
+#ann_thresholds = [15.99, 1.85, 2.04, 1.33, 0.34, 0.83, 0.87, 0.31, 1.73, 1.40, 1.41]
 
 #VGG16 CIFAR10 thresholds
 ann_thresholds = [4.26, 2.87, 0.48, 1.34, 0.21, 0.87, 1.12, 0.17, 1.30, 4.46, 0.56, 2.18, 1.70, 1.35, 1.33]
