@@ -21,3 +21,16 @@ The training is performed in the following two steps:
 * Sometimes the STDB activation becomes unstable during training, leading to accuracy drop. The solution is to modulate the alpha and beta parameter or change the activation to 'Linear' in main.py
 * Another reason for drop in accuracy could be the leak parameter. Please change leak_mem=1.0 in main.py. This changes the leaky-integrate-and-fire (LIF) neuron to integrate-and-fire (IF) neuron.
 
+# Citation
+If you use this code in your work, please cite the following [paper](https://openreview.net/forum?id=B1xSperKvH)
+```
+@inproceedings{
+Rathi2020Enabling,
+title={Enabling Deep Spiking Neural Networks with Hybrid Conversion and Spike Timing Dependent Backpropagation},
+author={Nitin Rathi and Gopalakrishnan Srinivasan and Priyadarshini Panda and Kaushik Roy},
+booktitle={International Conference on Learning Representations},
+year={2020},
+url={https://openreview.net/forum?id=B1xSperKvH}
+}
+```
+
