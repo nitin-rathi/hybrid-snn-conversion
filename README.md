@@ -4,8 +4,8 @@ This is the code related to the paper titled "Enabling Deep Spiking Neural Netwo
 
 # Training Methodology
 The training is performed in the following two steps:
-* Train an ANN (ann.py)
-* Convert the ANN to SNN and perform spike-based backpropagation (main.py)
+* Train an ANN ('ann.py')
+* Convert the ANN to SNN and perform spike-based backpropagation ('main.py')
 
 # Trained ANN models
 * [VGG5 CIFAR10](https://purdue0-my.sharepoint.com/:u:/g/personal/rathi2_purdue_edu/EeRnXta_mUlAspqjAYoRV_kB-7MFWCFg2dr1QkClhP1QZw?e=b0N6fu)
@@ -18,8 +18,8 @@ The training is performed in the following two steps:
 * [VGG11 CIFAR100](https://purdue0-my.sharepoint.com/:u:/g/personal/rathi2_purdue_edu/EeJz41FHZVpCvL6yZqWJtyIB3wRcUsnudsPp7QYiWPpH5w?e=gh74Vo)
 
 # Issues
-* Sometimes the STDB activation becomes unstable during training, leading to accuracy drop. The solution is to modulate the alpha and beta parameter or change the activation to 'Linear' in main.py
-* Another reason for drop in accuracy could be the leak parameter. Please change leak_mem=1.0 in main.py. This changes the leaky-integrate-and-fire (LIF) neuron to integrate-and-fire (IF) neuron.
+* Sometimes the 'STDB' activation becomes unstable during training, leading to accuracy drop. The solution is to modulate the alpha and beta parameter or change the activation to 'Linear' in 'main.py'
+* Another reason for drop in accuracy could be the leak parameter. Please change 'leak_mem=1.0' in 'main.py'. This changes the leaky-integrate-and-fire (LIF) neuron to integrate-and-fire (IF) neuron.
 
 # Citation
 If you use this code in your work, please cite the following [paper](https://openreview.net/forum?id=B1xSperKvH)
