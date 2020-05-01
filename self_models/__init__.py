@@ -1,2 +1,2 @@
-from .spiking_model import *
+from .vgg_spiking import *
 from .vgg import *

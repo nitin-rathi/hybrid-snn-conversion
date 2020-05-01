@@ -5,8 +5,12 @@ This is the code related to the paper titled "Enabling Deep Spiking Neural Netwo
 # Training Methodology
 The training is performed in the following two steps:
 * Train an ANN ('ann.py')
-* Convert the ANN to SNN and perform spike-based backpropagation ('main.py')
-
+* Convert the ANN to SNN and perform spike-based backpropagation ('snn.py')
+# Files
+* 'ann.py' : Trains an ANN, the architecutre, dataset, training settings can be provided an input argument
+* 'snn.py' : Trains an SNN from scratch or performs ANN-SNN conversion if pretrained ANN is available.
+* /self_models : Contains the model files for both ANN and SNN
+* 'ann_script.py' and 'snn_script.py': These scripts can be used to design various experiments, it creates 'script.sh' which can be used to run multiple models
 # Trained ANN models
 * [VGG5 CIFAR10](https://purdue0-my.sharepoint.com/:u:/g/personal/rathi2_purdue_edu/EeRnXta_mUlAspqjAYoRV_kB-7MFWCFg2dr1QkClhP1QZw?e=b0N6fu)
 * [VGG16 CIFAR10](https://purdue0-my.sharepoint.com/:u:/g/personal/rathi2_purdue_edu/EVQNuuHVX7xKppDaS_eEFRgBsgoMdjfF-IA7CQz_NV8YDA?e=nCVd2a)

@@ -1,4 +1,6 @@
-'''VGG11/13/16/19 in Pytorch.'''
+#############################
+#   @author: Nitin Rathi    #
+#############################
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -17,12 +19,46 @@ cfg = {
 
 
 class VGG(nn.Module):
-    def __init__(self, vgg_name, labels=10):
+    def __init__(self, vgg_name='VGG16', labels=10, dataset = 'CIFAR10', kernel_size=3, dropout=0.2):
         super(VGG, self).__init__()
         
-        self.features   = self._make_layers(cfg[vgg_name])
-        self.classifier = nn.Sequential(
+        self.dataset        = dataset
+        self.kernel_size    = kernel_size
+        self.dropout        = dropout
+        self.features       = self._make_layers(cfg[vgg_name])
+        if vgg_name == 'VGG5' and dataset!= 'MNIST':
+            self.classifier = nn.Sequential(
+                            nn.Linear(512*4*4, 4096, bias=False),
+                            nn.ReLU(inplace=True),
+                            nn.Dropout(0.5),
+                            nn.Linear(4096, 4096, bias=False),
+                            nn.ReLU(inplace=True),
+                            nn.Dropout(0.5),
+                            nn.Linear(4096, labels, bias=False)
+                            )
+        elif vgg_name!='VGG5' and dataset!='MNIST':
+            self.classifier = nn.Sequential(
                             nn.Linear(512*2*2, 4096, bias=False),
+                            nn.ReLU(inplace=True),
+                            nn.Dropout(0.5),
+                            nn.Linear(4096, 4096, bias=False),
+                            nn.ReLU(inplace=True),
+                            nn.Dropout(0.5),
+                            nn.Linear(4096, labels, bias=False)
+                            )
+        if vgg_name == 'VGG5' and dataset == 'MNIST':
+            self.classifier = nn.Sequential(
+                            nn.Linear(128*7*7, 4096, bias=False),
+                            nn.ReLU(inplace=True),
+                            nn.Dropout(0.5),
+                            nn.Linear(4096, 4096, bias=False),
+                            nn.ReLU(inplace=True),
+                            nn.Dropout(0.5),
+                            nn.Linear(4096, labels, bias=False)
+                            )
+        elif vgg_name!='VGG5' and dataset =='MNIST':
+            self.classifier = nn.Sequential(
+                            nn.Linear(512*1*1, 4096, bias=False),
                             nn.ReLU(inplace=True),
                             nn.Dropout(0.5),
                             nn.Linear(4096, 4096, bias=False),
@@ -73,17 +109,20 @@ class VGG(nn.Module):
     
     def _make_layers(self, cfg):
         layers = []
-        in_channels = 3
+
+        if self.dataset == 'MNIST':
+            in_channels = 1
+        else:
+            in_channels = 3
         
         for x in cfg:
             stride = 1
             
             if x == 'A':
-                
                 layers.pop()
                 layers += [nn.AvgPool2d(kernel_size=2, stride=2)]
             else:
-                layers += [nn.Conv2d(in_channels, x, kernel_size=3, padding=1, stride=stride, bias=False),
+                layers += [nn.Conv2d(in_channels, x, kernel_size=self.kernel_size, padding=(self.kernel_size-1)//2, stride=stride, bias=False),
                            nn.ReLU(inplace=True)
                            ]
                 layers += [nn.Dropout(0.2)]           
