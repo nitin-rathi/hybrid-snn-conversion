@@ -125,7 +125,7 @@ class VGG(nn.Module):
                 layers += [nn.Conv2d(in_channels, x, kernel_size=self.kernel_size, padding=(self.kernel_size-1)//2, stride=stride, bias=False),
                            nn.ReLU(inplace=True)
                            ]
-                layers += [nn.Dropout(0.2)]           
+                layers += [nn.Dropout(self.dropout)]           
                 in_channels = x
 
         

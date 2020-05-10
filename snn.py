@@ -45,9 +45,9 @@ class AverageMeter(object):
         fmtstr = '{name} {val' + self.fmt + '} ({avg' + self.fmt + '})'
         return fmtstr.format(**self.__dict__)
 
-def find_threshold(batch_size=512, timesteps=2500):
+def find_threshold(batch_size=512, timesteps=2500, architecture='VGG16'):
     
-    loader = torch.utils.data.DataLoader(dataset=trainset, batch_size=batch_size, shuffle=False)
+    loader = torch.utils.data.DataLoader(dataset=trainset, batch_size=batch_size, shuffle=True)
     model.module.network_update(timesteps=timesteps, leak=1.0)
 
     pos=0
@@ -56,9 +56,6 @@ def find_threshold(batch_size=512, timesteps=2500):
     def find(layer, pos):
         max_act=0
         
-        if layer == (len(model.module.features) + len(model.module.classifier) -1):
-            return None
-
         f.write('\n Finding threshold for layer {}'.format(layer))
         for batch_idx, (data, target) in enumerate(loader):
             
@@ -70,6 +67,7 @@ def find_threshold(batch_size=512, timesteps=2500):
                 output = model(data, find_max_mem=True, max_mem_layer=layer)
                 if output>max_act:
                     max_act = output.item()
+
                 #f.write('\nBatch:{} Current:{:.4f} Max:{:.4f}'.format(batch_idx+1,output.item(),max_act))
                 if batch_idx==0:
                     thresholds.append(max_act)
@@ -86,7 +84,10 @@ def find_threshold(batch_size=512, timesteps=2500):
         
         for c in model.module.classifier.named_children():
             if isinstance(c[1], nn.Linear):
-                pos = find(int(l[0])+int(c[0])+1, pos)
+                if (int(l[0])+int(c[0])+1) == (len(model.module.features) + len(model.module.classifier) -1):
+                    pass
+                else:
+                    pos = find(int(l[0])+int(c[0])+1, pos)
 
     if architecture.lower().startswith('res'):
         for l in model.module.pre_process.named_children():
@@ -124,6 +125,7 @@ def train(epoch):
         
         optimizer.zero_grad()
         output = model(data) 
+        #pdb.set_trace()
         loss = F.cross_entropy(output,target)
         loss.backward()
         optimizer.step()        
@@ -133,11 +135,11 @@ def train(epoch):
         losses.update(loss.item(),data.size(0))
         top1.update(correct.item()/data.size(0), data.size(0))
                 
-        if (batch_idx+1) % 100000 == 0:
+        if (batch_idx+1) % train_acc_batches == 0:
             temp1 = []
             for value in model.module.threshold.values():
                 temp1 = temp1+[round(value.item(),2)]
-            f.write('\nEpoch: {} batch: {} train_loss: {:.4f} train_acc: {:.4f}, threshold: {}, leak: {}, timesteps: {}'
+            f.write('\nEpoch: {}, batch: {}, train_loss: {:.4f}, train_acc: {:.4f}, threshold: {}, leak: {}, timesteps: {}'
                     .format(epoch,
                         batch_idx+1,
                         losses.avg,
@@ -147,7 +149,7 @@ def train(epoch):
                         model.module.timesteps
                         )
                     )
-    f.write('\nEpoch: {} LR: {:.1e}, train_loss: {:.4f} train_acc: {:.4f}'
+    f.write('\nEpoch: {}, lr: {:.1e}, train_loss: {:.4f}, train_acc: {:.4f}'
                     .format(epoch,
                         learning_rate,
                         losses.avg,
@@ -164,11 +166,6 @@ def test(epoch):
         model.eval()
         global max_accuracy
         
-        if epoch>5 and max_accuracy<0.15:
-            f.write('\n Quitting as the training is not progressing')
-            exit(0)
-
-        print_accuracy_every_batch = False
         for batch_idx, (data, target) in enumerate(test_loader):
                         
             if torch.cuda.is_available() and args.gpu:
@@ -182,7 +179,7 @@ def test(epoch):
             losses.update(loss.item(),data.size(0))
             top1.update(correct.item()/data.size(0), data.size(0))
             
-            if print_accuracy_every_batch:
+            if test_acc_every_batch:
                 
                 f.write('\nAccuracy: {}/{}({:.4f})'
                     .format(
@@ -196,6 +193,10 @@ def test(epoch):
         for value in model.module.threshold.values():
             temp1 = temp1+[value.item()]    
         
+        if epoch>5 and top1.avg<0.15:
+            f.write('\n Quitting as the training is not progressing')
+            exit(0)
+
         if top1.avg>max_accuracy:
             max_accuracy = top1.avg
              
@@ -219,7 +220,7 @@ def test(epoch):
             #if is_best:
             #    shutil.copyfile(filename, 'best_'+filename)
 
-        f.write(' test_loss: {:.4f}, current: {:.4f}, best: {:.4f} time: {}'
+        f.write(' test_loss: {:.4f}, test_acc: {:.4f}, best: {:.4f} time: {}'
             .format(
             losses.avg, 
             top1.avg,
@@ -234,7 +235,7 @@ if __name__ == '__main__':
     parser.add_argument('-s','--seed',              default=0,                  type=int,       help='seed for random number')
     parser.add_argument('--dataset',                default='CIFAR10',          type=str,       help='dataset name', choices=['MNIST','CIFAR10','CIFAR100'])
     parser.add_argument('--batch_size',             default=64,                 type=int,       help='minibatch size')
-    parser.add_argument('-a','--architecture',      default='VGG16',            type=str,       help='network architecture', choices=['VGG5','VGG9','VGG11','VGG13','VGG16','VGG19'])
+    parser.add_argument('-a','--architecture',      default='VGG16',            type=str,       help='network architecture', choices=['VGG5','VGG9','VGG11','VGG13','VGG16','VGG19','RESNET12','RESNET20','RESNET34'])
     parser.add_argument('-lr','--learning_rate',    default=1e-4,               type=float,     help='initial learning_rate')
     parser.add_argument('--pretrained_ann',         default='',                 type=str,       help='pretrained ANN model')
     parser.add_argument('--pretrained_snn',         default='',                 type=str,       help='pretrained SNN for inference')
@@ -253,10 +254,14 @@ if __name__ == '__main__':
     parser.add_argument('--optimizer',              default='Adam',             type=str,       help='optimizer for SNN backpropagation', choices=['SGD', 'Adam'])
     parser.add_argument('--dropout',                default=0.2,                type=float,     help='dropout percentage for conv layers')
     parser.add_argument('--kernel_size',            default=3,                  type=int,       help='filter size for the conv layers')
-    
+    parser.add_argument('--test_acc_every_batch',   action='store_true',                        help='print acc of every batch during inference')
+    parser.add_argument('--train_acc_batches',      default=200,                type=int,       help='print training progress after this many batches')
+    parser.add_argument('--devices',                default='0',                type=str,       help='list of gpu device(s)')
 
     args = parser.parse_args()
 
+    os.environ['CUDA_VISIBLE_DEVICES'] = args.devices
+    
     # Seed random number
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
@@ -283,6 +288,8 @@ if __name__ == '__main__':
     optimizer           = args.optimizer
     dropout             = args.dropout
     kernel_size         = args.kernel_size
+    test_acc_every_batch= args.test_acc_every_batch
+    train_acc_batches   = args.train_acc_batches
 
     values = args.lr_interval.split()
     lr_interval = []
@@ -309,14 +316,14 @@ if __name__ == '__main__':
             if val.lower()=='y' or val.lower()=='yes':
                 pretrained_ann = ann_file
 
-
-
     f.write('\n Run on time: {}'.format(datetime.datetime.now()))
 
     f.write('\n\n Arguments: ')
     for arg in vars(args):
         if arg == 'lr_interval':
             f.write('\n\t {:20} : {}'.format(arg, lr_interval))
+        elif arg == 'pretrained_ann':
+            f.write('\n\t {:20} : {}'.format(arg, pretrained_ann))
         else:
             f.write('\n\t {:20} : {}'.format(arg, getattr(args,arg)))
     
@@ -372,7 +379,6 @@ if __name__ == '__main__':
                                 normalize,
                             ])) 
 
-
     train_loader    = DataLoader(trainset, batch_size=batch_size, shuffle=True)
     test_loader     = DataLoader(testset, batch_size=batch_size, shuffle=False)
 
@@ -380,7 +386,7 @@ if __name__ == '__main__':
         model = VGG_SNN_STDB(vgg_name = architecture, activation = activation, labels=labels, timesteps=timesteps, leak=leak, default_threshold=default_threshold, alpha=alpha, beta=beta, dropout=dropout, kernel_size=kernel_size, dataset=dataset)
     
     elif architecture[0:3].lower() == 'res':
-        model = RESNET_SNN_STDB(name = architecture, labels=labels, timesteps=timesteps,leak_mem=leak_mem, STDP_alpha=STDP_alpha, STDP_beta=STDP_beta)
+        model = RESNET_SNN_STDB(resnet_name = architecture, activation = activation, labels=labels, timesteps=timesteps,leak=leak, default_threshold=default_threshold, alpha=alpha, beta=beta, dropout=dropout, dataset=dataset)
 
     # if freeze_conv:
     #     for param in model.features.parameters():
@@ -390,81 +396,72 @@ if __name__ == '__main__':
     model = nn.DataParallel(model) 
     
     if pretrained_ann:
-        
-        if architecture[0:3].lower() == 'vgg':
-            state = torch.load(pretrained_ann, map_location='cpu')
-            cur_dict = model.state_dict()     
-            for key in state['state_dict'].keys():
-                if key in cur_dict:
-                    if (state['state_dict'][key].shape == cur_dict[key].shape):
-                        cur_dict[key] = nn.Parameter(state['state_dict'][key].data)
-                        f.write('\n Loaded {} from {}'.format(key, pretrained_ann))
-                    else:
-                        f.write('\n Size mismatch, size of loaded model {}, size of current model {}'.format(state['state_dict'][key].shape, model.state_dict()[key].shape))
+      
+        state = torch.load(pretrained_ann, map_location='cpu')
+        cur_dict = model.state_dict()     
+        for key in state['state_dict'].keys():
+            if key in cur_dict:
+                if (state['state_dict'][key].shape == cur_dict[key].shape):
+                    cur_dict[key] = nn.Parameter(state['state_dict'][key].data)
+                    f.write('\n Success: Loaded {} from {}'.format(key, pretrained_ann))
                 else:
-                    f.write('\n Loaded weight {} not present in current model'.format(key))
-            model.load_state_dict(cur_dict)
-            
-            #If thresholds present in loaded ANN file
-            if 'thresholds' in state.keys():
-                thresholds = state['thresholds']
-                f.write('\n Thresholds loaded from trained ANN: {}'.format(thresholds))
-                model.module.threshold_update(scaling_factor = scaling_factor, thresholds=thresholds[:])
-
+                    f.write('\n Error: Size mismatch, size of loaded model {}, size of current model {}'.format(state['state_dict'][key].shape, model.state_dict()[key].shape))
             else:
-                thresholds = find_threshold(batch_size=512, timesteps=1000)
-                model.module.threshold_update(scaling_factor = scaling_factor, thresholds=thresholds[:])
-                
-                #Save the threhsolds in the ANN file
-                temp = {}
-                for key,value in state.items():
-                    temp[key] = value
-                temp['thresholds'] = thresholds
-                torch.save(temp, pretrained_ann)
-   
-        elif architecture[0:3].lower() == 'res':
-            state = torch.load(pretrained_state, map_location='cpu')
-            f.write('\n Variables loaded from pretrained model:')
-            for key, value in state.items():
-                if isinstance(value, (int, float)):
-                    f.write('\n {} : {}'.format(key, value))
-                else:
-                    f.write('\n {}: '.format(key))
-            model.load_state_dict(state['state_dict'])
+                f.write('\n Error: Loaded weight {} not present in current model'.format(key))
+        model.load_state_dict(cur_dict)
+        f.write('\n Info: Accuracy of loaded ANN model: {}'.format(state['accuracy']))
+
+        #If thresholds present in loaded ANN file
+        if 'thresholds' in state.keys():
+            thresholds = state['thresholds']
+            f.write('\n Info: Thresholds loaded from trained ANN: {}'.format(thresholds))
+            model.module.threshold_update(scaling_factor = scaling_factor, thresholds=thresholds[:])
+        else:
+            thresholds = find_threshold(batch_size=512, timesteps=1000, architecture=architecture)
+            model.module.threshold_update(scaling_factor = scaling_factor, thresholds=thresholds[:])
+            
+            #Save the threhsolds in the ANN file
+            temp = {}
+            for key,value in state.items():
+                temp[key] = value
+            temp['thresholds'] = thresholds
+            torch.save(temp, pretrained_ann)
     
     if pretrained_snn:
-        
-        if architecture[0:3].lower() == 'vgg':
-            state = torch.load(pretrained_snn, map_location='cpu')
-            cur_dict = model.state_dict()     
-            for key in state['state_dict'].keys():
-                if key in cur_dict:
-                    if (state['state_dict'][key].shape == cur_dict[key].shape):
-                        cur_dict[key] = nn.Parameter(state['state_dict'][key].data)
-                        f.write('\n Loaded {} from {}'.format(key, pretrained_snn))
-                    else:
-                        f.write('\n Size mismatch, size of loaded model {}, size of current model {}'.format(state['state_dict'][key].shape, model.state_dict()[key].shape))
+                
+        state = torch.load(pretrained_snn, map_location='cpu')
+        cur_dict = model.state_dict()     
+        for key in state['state_dict'].keys():
+            if key in cur_dict:
+                if (state['state_dict'][key].shape == cur_dict[key].shape):
+                    cur_dict[key] = nn.Parameter(state['state_dict'][key].data)
+                    f.write('\n Loaded {} from {}'.format(key, pretrained_snn))
                 else:
-                    f.write('\n Loaded weight {} not present in current model'.format(state['state_dict'][key]))
-            model.load_state_dict(cur_dict)
-
-            if 'thresholds' in state.keys():
-                if state['timesteps']!=timesteps or state['leak']!=leak:
-                    f.write('\n Timesteps/Leak mismatch between loaded SNN and current simulation timesteps/leak, current timesteps/leak {}/{}, loaded timesteps/leak {}/{}'.format(timesteps, leak, state['timesteps'], state['leak']))
-                thresholds = state['thresholds']
-                model.module.threshold_update(scaling_factor = 1.0, thresholds=thresholds[:])
+                    f.write('\n Size mismatch, size of loaded model {}, size of current model {}'.format(state['state_dict'][key].shape, model.state_dict()[key].shape))
             else:
-                f.write('\n Loaded SNN model does not have thresholds')
+                f.write('\n Loaded weight {} not present in current model'.format(state['state_dict'][key]))
+        model.load_state_dict(cur_dict)
 
+        if 'thresholds' in state.keys():
+            if state['timesteps']!=timesteps or state['leak']!=leak:
+                f.write('\n Timesteps/Leak mismatch between loaded SNN and current simulation timesteps/leak, current timesteps/leak {}/{}, loaded timesteps/leak {}/{}'.format(timesteps, leak, state['timesteps'], state['leak']))
+            thresholds = state['thresholds']
+            model.module.threshold_update(scaling_factor = 1.0, thresholds=thresholds[:])
+        else:
+            f.write('\n Loaded SNN model does not have thresholds')
+
+    f.write('\n {}'.format(model))
+    
     #model = nn.DataParallel(model) 
     if torch.cuda.is_available() and args.gpu:
         model.cuda()
 
     if optimizer == 'Adam':
-        optimizer = optim.Adam(model.parameters(), lr=learning_rate, amsgrad=True)
+        optimizer = optim.Adam(model.parameters(), lr=learning_rate, amsgrad=True, weight_decay=5e-4)
     elif optimizer == 'SGD':
-        optimizer = optim.SGD(model.parameters(), lr=learning_rate)
-        
+        optimizer = optim.SGD(model.parameters(), lr=learning_rate, weight_decay=5e-4, momentum=0.9)
+    
+    f.write('\n {}'.format(optimizer))
     max_accuracy = 0
     
     #print(model)

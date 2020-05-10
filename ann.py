@@ -72,30 +72,8 @@ def train(epoch, loader):
 
         losses.update(loss.item(), data.size(0))
         top1.update(correct.item()/data.size(0), data.size(0))
-
-        # if (batch_idx+1) % 100 == 0:
-        #     #f.write('\nconv1: {:.2e}, conv2: {:.2e}, conv3: {:.2e}'.format(
-        #     #model.conv1.weight.mean().item(),
-        #     #model.conv2.weight.mean().item(),
-        #     #model.conv3.weight.mean().item(),
-        #     #))
-            
-        #     f.write('Epoch: {} [{}/{} ({:.0f}%)] Loss: {:.6f} Current:[{}/{} ({:.2f}%)] Total:[{}/{} ({:.2f}%)] Time: {}'.format(
-        #         epoch,
-        #         (batch_idx+1) * len(data),
-        #         len(loader.dataset),
-        #         100. * (batch_idx+1) / len(loader),
-        #         loss,
-        #         correct.item(),
-        #         data.size(0),
-        #         100. * correct.item()/data.size(0),
-        #         total_correct,
-        #         data.size(0)*(batch_idx+1),
-        #         100. * total_correct/(data.size(0)*(batch_idx+1)),
-        #         datetime.timedelta(seconds=(datetime.datetime.now() - start_time).seconds)
-        #         )
-        #     )
-    f.write('\n Epoch: {}, LR: {:.1e}, Train Loss: {:.4f}, Train accuracy: {:.4f}'.format(
+        
+    f.write('\n Epoch: {}, lr: {:.1e}, train_loss: {:.4f}, train_acc: {:.4f}'.format(
             epoch,
             learning_rate,
             losses.avg,
@@ -113,10 +91,7 @@ def test(loader):
         total_loss = 0
         correct = 0
         global max_accuracy, start_time
-        if epoch>30 and max_accuracy<0.15:
-            f.write('\n Quitting as the training is not progressing')
-            exit(0)
-
+        
         for batch_idx, (data, target) in enumerate(loader):
                         
             if torch.cuda.is_available() and args.gpu:
@@ -129,6 +104,10 @@ def test(loader):
             correct = pred.eq(target.data.view_as(pred)).cpu().sum()
             losses.update(loss.item(), data.size(0))
             top1.update(correct.item()/data.size(0), data.size(0))
+
+        if epoch>30 and top1.avg<0.15:
+            f.write('\n Quitting as the training is not progressing')
+            exit(0)
 
         if top1.avg>max_accuracy:
             max_accuracy = top1.avg
@@ -146,7 +125,7 @@ def test(loader):
             filename = './trained_models/ann/'+identifier+'.pth'
             torch.save(state,filename)
             
-        f.write(' Test Loss: {:.4f}, Current: {:.4f}, Best: {:.4f}, Time: {}'.  format(
+        f.write(' test_loss: {:.4f}, test_acc: {:.4f}, best: {:.4f}, time: {}'.  format(
             losses.avg, 
             top1.avg,
             max_accuracy,
@@ -165,19 +144,25 @@ if __name__ == '__main__':
     parser.add_argument('-s','--seed',              default=0,                  type=int,       help='seed for random number')
     parser.add_argument('--dataset',                default='CIFAR10',          type=str,       help='dataset name', choices=['MNIST','CIFAR10','CIFAR100'])
     parser.add_argument('--batch_size',             default=64,                 type=int,       help='minibatch size')
-    parser.add_argument('-a','--architecture',      default='VGG16',            type=str,       help='network architecture', choices=['VGG5','VGG9','VGG11','VGG13','VGG16','VGG19'])
+    parser.add_argument('-a','--architecture',      default='VGG16',            type=str,       help='network architecture', choices=['VGG5','VGG9','VGG11','VGG13','VGG16','VGG19','RESNET12','RESNET20','RESNET34'])
     parser.add_argument('-lr','--learning_rate',    default=1e-2,               type=float,     help='initial learning_rate')
     parser.add_argument('--pretrained_ann',         default='',                 type=str,       help='pretrained model to initialize ANN')
     parser.add_argument('--test_only',              action='store_true',                        help='perform only inference')
     parser.add_argument('--epochs',                 default=300,                type=int,       help='number of training epochs')
-    parser.add_argument('--lr_interval',            default='0.40 0.65 0.85',   type=str,       help='intervals at which to reduce lr, expressed as %%age of total epochs')
+    parser.add_argument('--lr_interval',            default='0.60 0.80 0.90',   type=str,       help='intervals at which to reduce lr, expressed as %%age of total epochs')
     parser.add_argument('--lr_reduce',              default=10,                 type=int,       help='reduction factor for learning rate')
-    parser.add_argument('--optimizer',              default='Adam',             type=str,       help='optimizer for SNN backpropagation', choices=['SGD', 'Adam'])
+    parser.add_argument('--optimizer',              default='SGD',              type=str,       help='optimizer for SNN backpropagation', choices=['SGD', 'Adam'])
+    parser.add_argument('--weight_decay',           default=5e-4,               type=float,     help='weight decay parameter for the optimizer')
+    parser.add_argument('--momentum',               default=0.9,                type=float,     help='momentum parameter for the SGD optimizer')
+    parser.add_argument('--amsgrad',                default=True,               type=bool,      help='amsgrad parameter for Adam optimizer')
     parser.add_argument('--dropout',                default=0.2,                type=float,     help='dropout percentage for conv layers')
     parser.add_argument('--kernel_size',            default=3,                  type=int,       help='filter size for the conv layers')
+    parser.add_argument('--devices',                default='0',                type=str,       help='list of gpu device(s)')
         
     args=parser.parse_args()
 
+    os.environ['CUDA_VISIBLE_DEVICES'] = args.devices
+    
     # Seed random number
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
@@ -194,6 +179,9 @@ if __name__ == '__main__':
     epochs          = args.epochs
     lr_reduce       = args.lr_reduce
     optimizer       = args.optimizer
+    weight_decay    = args.weight_decay
+    momentum        = args.momentum
+    amsgrad         = args.amsgrad
     dropout         = args.dropout
     kernel_size     = args.kernel_size
 
@@ -209,7 +197,7 @@ if __name__ == '__main__':
     except OSError:
         pass 
     
-    identifier = 'ann_'+architecture.lower()+'_'+dataset.lower()
+    identifier = 'ann_'+architecture.lower()+'_'+dataset.lower()+'_'+str(datetime.datetime.now())
     log_file+=identifier+'.log'
     
     if args.log:
@@ -267,8 +255,15 @@ if __name__ == '__main__':
     
     test_loader     = torch.utils.data.DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=False)
     
-    
-    model = VGG(vgg_name=architecture, labels=labels, dataset=dataset, kernel_size=kernel_size, dropout=dropout)
+    if architecture[0:3].lower() == 'vgg':
+        model = VGG(vgg_name=architecture, labels=labels, dataset=dataset, kernel_size=kernel_size, dropout=dropout)
+    elif architecture[0:3].lower() == 'res':
+        if architecture.lower() == 'resnet12':
+            model = ResNet12(labels=labels, dropout=dropout)
+        elif architecture.lower() == 'resnet20':
+            model = ResNet20(labels=labels, dropout=dropout)
+        elif architecture.lower() == 'resnet34':
+            model = ResNet34(labels=labels, dropout=dropout) 
     #f.write('\n{}'.format(model))
     
     #CIFAR100 sometimes has problem to start training
@@ -282,26 +277,33 @@ if __name__ == '__main__':
             if key in cur_dict:
                 if (state['state_dict'][key].shape == cur_dict[key].shape):
                     cur_dict[key] = nn.Parameter(state['state_dict'][key].data)
-                    f.write('\n Loaded {} from {}'.format(key, pretrained_ann))
+                    f.write('\n Success: Loaded {} from {}'.format(key, pretrained_ann))
                 else:
-                    f.write('\n Size mismatch, size of loaded model {}, size of current model {}'.format(state['state_dict'][key].shape, model.state_dict()[key].shape))
+                    f.write('\n Error: Size mismatch, size of loaded model {}, size of current model {}'.format(state['state_dict'][key].shape, model.state_dict()[key].shape))
             else:
-                f.write('\n Loaded weight {} not present in current model'.format(key))
+                f.write('\n Error: Loaded weight {} not present in current model'.format(key))
         
         model.load_state_dict(cur_dict)
     
-     
+    f.write('\n {}'.format(model)) 
+    
     if torch.cuda.is_available() and args.gpu:
         model.cuda()
     
     if optimizer == 'SGD':
-        optimizer = optim.SGD(model.parameters(), lr=learning_rate)
+        optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=momentum, weight_decay=weight_decay, nesterov=True)
     elif optimizer == 'Adam':
-        optimizer = optim.Adam(model.parameters(), lr=learning_rate, amsgrad=True)
+        optimizer = optim.Adam(model.parameters(), lr=learning_rate, amsgrad=amsgrad, weight_decay=weight_decay)
     
+    f.write('\n {}'.format(optimizer))
     max_accuracy = 0
-    
-    for epoch in range(1, epochs):    
+    optimizer_switch = 0.2
+    for epoch in range(1, epochs):
+        # if epoch > optimizer_switch*epochs:
+        #     optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=momentum, weight_decay=weight_decay)
+        # else:
+        #     optimizer = optim.Adam(model.parameters(), lr=1e-4, amsgrad=amsgrad, weight_decay=weight_decay)
+        # f.write(' Optim: {}'.format(optimizer.__module__.split('.')[-1]))
         start_time = datetime.datetime.now()
         train(epoch, train_loader)
         test(test_loader)

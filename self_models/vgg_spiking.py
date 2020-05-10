@@ -82,7 +82,7 @@ class VGG_SNN_STDB(nn.Module):
 		if activation == 'Linear':
 			self.act_func 	= LinearSpike.apply
 		elif activation == 'STDB':
-			self.act_func	= STDPSpike.apply
+			self.act_func	= STDB.apply
 		self.labels 		= labels
 		self.timesteps 		= timesteps
 		self.leak 	 		= torch.tensor(leak)
@@ -99,6 +99,8 @@ class VGG_SNN_STDB(nn.Module):
 		
 		self.features, self.classifier = self._make_layers(cfg[self.vgg_name])
 		
+		self._initialize_weights2()
+
 		for l in range(len(self.features)):
 			if isinstance(self.features[l], nn.Conv2d):
 				self.threshold[l] 	= torch.tensor(default_threshold)
@@ -107,7 +109,23 @@ class VGG_SNN_STDB(nn.Module):
 		for l in range(len(self.classifier)-1):
 			if isinstance(self.classifier[l], nn.Linear):
 				self.threshold[prev+l] 	= torch.tensor(default_threshold)
-				
+
+	def _initialize_weights2(self):
+		for m in self.modules():
+            
+			if isinstance(m, nn.Conv2d):
+				n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
+				m.weight.data.normal_(0, math.sqrt(2. / n))
+				if m.bias is not None:
+					m.bias.data.zero_()
+			elif isinstance(m, nn.BatchNorm2d):
+				m.weight.data.fill_(1)
+				m.bias.data.zero_()
+			elif isinstance(m, nn.Linear):
+				n = m.weight.size(1)
+				m.weight.data.normal_(0, 0.01)
+				if m.bias is not None:
+					m.bias.data.zero_()
 
 	def threshold_update(self, scaling_factor=1.0, thresholds=[]):
 
@@ -210,8 +228,8 @@ class VGG_SNN_STDB(nn.Module):
 				self.mask[l] = self.features[l](torch.ones(self.mem[l-2].shape))
 
 			elif isinstance(self.features[l], nn.AvgPool2d):
-				self.width = self.width//2
-				self.height = self.height//2
+				self.width = self.width//self.features[l].kernel_size
+				self.height = self.height//self.features[l].kernel_size
 		
 		prev = len(self.features)
 
@@ -227,8 +245,6 @@ class VGG_SNN_STDB(nn.Module):
 		for key, values in self.spike.items():
 			for value in values:
 				value.fill_(-1000)
-
-		
 
 	def forward(self, x, find_max_mem=False, max_mem_layer=0):
 		

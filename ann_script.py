@@ -11,15 +11,15 @@ import argparse
 from scipy.special import comb
 
 hyperparameters = {
-	'architecture'	:	{'VGG5','VGG9'},
+	'architecture'	:	{'RESNET12','RESNET20','RESNET34'},
 	'learning_rate'	:	{'1e-2'},
-	'epochs'		:	{'200'},
-	'lr_interval'	:	{'\'0.40 0.60 0.80 0.90\''},
-	'lr_reduce'		: 	{'5'},
-	'dataset'		:	{'MNIST'},
+	'epochs'		:	{'300'},
+	'lr_interval'	:	{'\'0.40 0.60 0.80\''},
+	'lr_reduce'		: 	{'10'},
+	'dataset'		:	{'CIFAR100'},
 	'batch_size'	:	{'64'},
-	'optimizer' 	: 	{'SGD'}
-
+	'optimizer' 	: 	{'SGD'},
+	'dropout'		:	{'0.2'}
 }
 
 if __name__ == '__main__':
