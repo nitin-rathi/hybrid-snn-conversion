@@ -235,14 +235,14 @@ if __name__ == '__main__':
     parser.add_argument('-s','--seed',              default=0,                  type=int,       help='seed for random number')
     parser.add_argument('--dataset',                default='CIFAR10',          type=str,       help='dataset name', choices=['MNIST','CIFAR10','CIFAR100'])
     parser.add_argument('--batch_size',             default=64,                 type=int,       help='minibatch size')
-    parser.add_argument('-a','--architecture',      default='VGG16',            type=str,       help='network architecture', choices=['VGG5','VGG9','VGG11','VGG13','VGG16','VGG19','RESNET12','RESNET20','RESNET34'])
+    parser.add_argument('-a','--architecture',      default='VGG16',            type=str,       help='network architecture', choices=['VGG5','VGG9','VGG11','VGG13','VGG16','VGG19'])
     parser.add_argument('-lr','--learning_rate',    default=1e-4,               type=float,     help='initial learning_rate')
     parser.add_argument('--pretrained_ann',         default='',                 type=str,       help='pretrained ANN model')
     parser.add_argument('--pretrained_snn',         default='',                 type=str,       help='pretrained SNN for inference')
     parser.add_argument('--test_only',              action='store_true',                        help='perform only inference')
     parser.add_argument('--log',                    action='store_true',                        help='to print the output on terminal or to log file')
     parser.add_argument('--epochs',                 default=300,                type=int,       help='number of training epochs')
-    parser.add_argument('--lr_interval',            default='0.40 0.65 0.85',   type=str,       help='intervals at which to reduce lr, expressed as %%age of total epochs')
+    parser.add_argument('--lr_interval',            default='0.60 0.80 0.90',   type=str,       help='intervals at which to reduce lr, expressed as %%age of total epochs')
     parser.add_argument('--lr_reduce',              default=10,                 type=int,       help='reduction factor for learning rate')
     parser.add_argument('--timesteps',              default=100,                type=int,       help='simulation timesteps')
     parser.add_argument('--leak',                   default=1.0,                type=float,     help='membrane leak')
@@ -252,7 +252,10 @@ if __name__ == '__main__':
     parser.add_argument('--alpha',                  default=0.3,                type=float,     help='parameter alpha for STDB')
     parser.add_argument('--beta',                   default=0.01,               type=float,     help='parameter beta for STDB')
     parser.add_argument('--optimizer',              default='Adam',             type=str,       help='optimizer for SNN backpropagation', choices=['SGD', 'Adam'])
-    parser.add_argument('--dropout',                default=0.2,                type=float,     help='dropout percentage for conv layers')
+    parser.add_argument('--weight_decay',           default=5e-4,               type=float,     help='weight decay parameter for the optimizer')    
+    parser.add_argument('--momentum',               default=0.95,                type=float,     help='momentum parameter for the SGD optimizer')    
+    parser.add_argument('--amsgrad',                default=True,               type=bool,      help='amsgrad parameter for Adam optimizer')
+    parser.add_argument('--dropout',                default=0.3,                type=float,     help='dropout percentage for conv layers')
     parser.add_argument('--kernel_size',            default=3,                  type=int,       help='filter size for the conv layers')
     parser.add_argument('--test_acc_every_batch',   action='store_true',                        help='print acc of every batch during inference')
     parser.add_argument('--train_acc_batches',      default=200,                type=int,       help='print training progress after this many batches')
@@ -286,6 +289,9 @@ if __name__ == '__main__':
     alpha               = args.alpha
     beta                = args.beta  
     optimizer           = args.optimizer
+    weight_decay        = args.weight_decay
+    momentum            = args.momentum
+    amsgrad             = args.amsgrad
     dropout             = args.dropout
     kernel_size         = args.kernel_size
     test_acc_every_batch= args.test_acc_every_batch
@@ -301,6 +307,8 @@ if __name__ == '__main__':
         os.mkdir(log_file)
     except OSError:
         pass 
+
+    #identifier = 'snn_'+architecture.lower()+'_'+dataset.lower()+'_'+str(timesteps)+'_'+str(datetime.datetime.now())
     identifier = 'snn_'+architecture.lower()+'_'+dataset.lower()+'_'+str(timesteps)
     log_file+=identifier+'.log'
     
@@ -457,9 +465,9 @@ if __name__ == '__main__':
         model.cuda()
 
     if optimizer == 'Adam':
-        optimizer = optim.Adam(model.parameters(), lr=learning_rate, amsgrad=True, weight_decay=5e-4)
+        optimizer = optim.Adam(model.parameters(), lr=learning_rate, amsgrad=amsgrad, weight_decay=weight_decay)
     elif optimizer == 'SGD':
-        optimizer = optim.SGD(model.parameters(), lr=learning_rate, weight_decay=5e-4, momentum=0.9)
+        optimizer = optim.SGD(model.parameters(), lr=learning_rate, weight_decay=weight_decay, momentum=momentum)
     
     f.write('\n {}'.format(optimizer))
     max_accuracy = 0

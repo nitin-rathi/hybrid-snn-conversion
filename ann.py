@@ -144,7 +144,7 @@ if __name__ == '__main__':
     parser.add_argument('-s','--seed',              default=0,                  type=int,       help='seed for random number')
     parser.add_argument('--dataset',                default='CIFAR10',          type=str,       help='dataset name', choices=['MNIST','CIFAR10','CIFAR100'])
     parser.add_argument('--batch_size',             default=64,                 type=int,       help='minibatch size')
-    parser.add_argument('-a','--architecture',      default='VGG16',            type=str,       help='network architecture', choices=['VGG5','VGG9','VGG11','VGG13','VGG16','VGG19'])
+    parser.add_argument('-a','--architecture',      default='VGG16',            type=str,       help='network architecture', choices=['VGG5','VGG9','VGG11','VGG13','VGG16','VGG19','RESNET12','RESNET20','RESNET34'])
     parser.add_argument('-lr','--learning_rate',    default=1e-2,               type=float,     help='initial learning_rate')
     parser.add_argument('--pretrained_ann',         default='',                 type=str,       help='pretrained model to initialize ANN')
     parser.add_argument('--test_only',              action='store_true',                        help='perform only inference')
@@ -197,7 +197,8 @@ if __name__ == '__main__':
     except OSError:
         pass 
     
-    identifier = 'ann_'+architecture.lower()+'_'+dataset.lower()+'_'+str(datetime.datetime.now())
+    #identifier = 'ann_'+architecture.lower()+'_'+dataset.lower()+'_'+str(datetime.datetime.now())
+    identifier = 'ann_'+architecture.lower()+'_'+dataset.lower()
     log_file+=identifier+'.log'
     
     if args.log:
@@ -291,19 +292,15 @@ if __name__ == '__main__':
         model.cuda()
     
     if optimizer == 'SGD':
-        optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=momentum, weight_decay=weight_decay, nesterov=True)
+        optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=momentum, weight_decay=weight_decay)
     elif optimizer == 'Adam':
         optimizer = optim.Adam(model.parameters(), lr=learning_rate, amsgrad=amsgrad, weight_decay=weight_decay)
     
     f.write('\n {}'.format(optimizer))
     max_accuracy = 0
-    optimizer_switch = 0.2
+    
     for epoch in range(1, epochs):
-        # if epoch > optimizer_switch*epochs:
-        #     optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=momentum, weight_decay=weight_decay)
-        # else:
-        #     optimizer = optim.Adam(model.parameters(), lr=1e-4, amsgrad=amsgrad, weight_decay=weight_decay)
-        # f.write(' Optim: {}'.format(optimizer.__module__.split('.')[-1]))
+        
         start_time = datetime.datetime.now()
         train(epoch, train_loader)
         test(test_loader)

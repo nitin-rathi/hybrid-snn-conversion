@@ -118,9 +118,7 @@ class VGG_SNN_STDB(nn.Module):
 				m.weight.data.normal_(0, math.sqrt(2. / n))
 				if m.bias is not None:
 					m.bias.data.zero_()
-			elif isinstance(m, nn.BatchNorm2d):
-				m.weight.data.fill_(1)
-				m.bias.data.zero_()
+			
 			elif isinstance(m, nn.Linear):
 				n = m.weight.size(1)
 				m.weight.data.normal_(0, 0.01)
@@ -136,15 +134,14 @@ class VGG_SNN_STDB(nn.Module):
 			if isinstance(self.features[pos], nn.Conv2d):
 				if thresholds:
 					self.threshold[pos] = torch.tensor(thresholds.pop(0)*self.scaling_factor)
-				#print('\t Layer{} : {:.2f}'.format(pos, self.threshold[pos]))
-
+		
 		prev = len(self.features)
 
 		for pos in range(len(self.classifier)-1):
 			if isinstance(self.classifier[pos], nn.Linear):
 				if thresholds:
 					self.threshold[prev+pos] = torch.tensor(thresholds.pop(0)*self.scaling_factor)
-				#print('\t Layer{} : {:.2f}'.format(prev+pos, self.threshold[prev+pos]))
+				
 
 	def _make_layers(self, cfg):
 		layers 		= []

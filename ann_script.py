@@ -11,25 +11,23 @@ import argparse
 from scipy.special import comb
 
 hyperparameters = {
-	'architecture'	:	{'RESNET12','RESNET20','RESNET34'},
+	'architecture'	:	{'VGG16'},
 	'learning_rate'	:	{'1e-2'},
 	'epochs'		:	{'300'},
-	'lr_interval'	:	{'\'0.40 0.60 0.80\''},
+	'lr_interval'	:	{'\'0.60 0.80 0.90\''},
 	'lr_reduce'		: 	{'10'},
-	'dataset'		:	{'CIFAR100'},
+	'dataset'		:	{'CIFAR10'},
 	'batch_size'	:	{'64'},
 	'optimizer' 	: 	{'SGD'},
-	'dropout'		:	{'0.2'}
+	'dropout'		:	{'0.3'}
 }
 
 if __name__ == '__main__':
 	
-	parser = argparse.ArgumentParser(description='create script for hyperparameter optimization')
+	parser = argparse.ArgumentParser(description='create script for running a file')
 	parser.add_argument('--filename', 		default='ann.py',		help='python filename to run')
 	parser.add_argument('--parallel',		action='store_true',	help='whether to allow all combinations to run simultaneously')
 	args = parser.parse_args()
-
-
 
 	f = open('script.sh', 'w', buffering=1)
 	f.write('#!/bin/bash')

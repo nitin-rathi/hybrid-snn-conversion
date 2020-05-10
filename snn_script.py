@@ -15,12 +15,12 @@ from scipy.special import comb
 #So for samll timesteps the scaling_factor should be small
 #For timesteps above 100 scaling_factor of 0.6-0.8 can be used
 
-pretrained_ann = './trained_models/ann/ann_vgg9_mnist.pth'
+pretrained_ann = './trained_models/ann/ann_vgg5_mnist.pth'
 hyperparameters = {
-	'architecture'	:	{'VGG9'},
+	'architecture'	:	{'VGG5'},
 	'learning_rate'	:	{'1e-4'},
 	'epochs'		:	{'50'},
-	'lr_interval'	:	{'\'0.40 0.60 0.80 0.90\''},
+	'lr_interval'	:	{'\'0.60 0.80 0.90\''},
 	'lr_reduce'		: 	{'5'},
 	'dataset'		:	{'MNIST'},
 	'batch_size'	:	{'64'},
@@ -28,13 +28,13 @@ hyperparameters = {
 	'timesteps'		: 	{'50'},
 	'leak' 			: 	{'1.0'},
 	'scaling_factor':	{'0.7'},
-	'dropout' 		: 	{'0.2'},
+	'dropout' 		: 	{'0.3'},
 	'kernel_size'	:	{'3'}
 }
 
 if __name__ == '__main__':
 	
-	parser = argparse.ArgumentParser(description='create script for hyperparameter optimization')
+	parser = argparse.ArgumentParser(description='create script for running a file')
 	parser.add_argument('--filename', 		default='snn.py',		help='python filename to run')
 	parser.add_argument('--parallel',		action='store_true',	help='whether to allow all combinations to run simultaneously')
 	args = parser.parse_args()
