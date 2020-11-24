@@ -340,6 +340,13 @@ if __name__ == '__main__':
     if torch.cuda.is_available() and args.gpu:
         torch.set_default_tensor_type('torch.cuda.FloatTensor')
 
+    # if dataset == 'CIFAR10':
+    #     normalize   = transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
+    # elif dataset == 'CIFAR100':
+    #     normalize   = transforms.Normalize((0.5071,0.4867,0.4408), (0.2675,0.2565,0.2761))
+    # elif dataset == 'IMAGENET':
+    #     normalize   = transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
+
     normalize       = transforms.Normalize(mean = [0.5, 0.5, 0.5], std = [0.5, 0.5, 0.5])
     
     if dataset in ['CIFAR10', 'CIFAR100']:
@@ -438,23 +445,30 @@ if __name__ == '__main__':
     if pretrained_snn:
                 
         state = torch.load(pretrained_snn, map_location='cpu')
+        
         cur_dict = model.state_dict()     
         for key in state['state_dict'].keys():
+            
             if key in cur_dict:
                 if (state['state_dict'][key].shape == cur_dict[key].shape):
                     cur_dict[key] = nn.Parameter(state['state_dict'][key].data)
                     f.write('\n Loaded {} from {}'.format(key, pretrained_snn))
                 else:
-                    f.write('\n Size mismatch, size of loaded model {}, size of current model {}'.format(state['state_dict'][key].shape, model.state_dict()[key].shape))
+                    f.write('\n Size mismatch {}, size of loaded model {}, size of current model {}'.format(key, state['state_dict'][key].shape, model.state_dict()[key].shape))
             else:
-                f.write('\n Loaded weight {} not present in current model'.format(state['state_dict'][key]))
+                f.write('\n Loaded weight {} not present in current model'.format(key))
         model.load_state_dict(cur_dict)
 
         if 'thresholds' in state.keys():
+            try:
+                if state['leak_mem']:
+                    state['leak'] = state['leak_mem']
+            except:
+                pass
             if state['timesteps']!=timesteps or state['leak']!=leak:
                 f.write('\n Timesteps/Leak mismatch between loaded SNN and current simulation timesteps/leak, current timesteps/leak {}/{}, loaded timesteps/leak {}/{}'.format(timesteps, leak, state['timesteps'], state['leak']))
             thresholds = state['thresholds']
-            model.module.threshold_update(scaling_factor = 1.0, thresholds=thresholds[:])
+            model.module.threshold_update(scaling_factor = state['scaling_threshold'], thresholds=thresholds[:])
         else:
             f.write('\n Loaded SNN model does not have thresholds')
 

@@ -11,10 +11,11 @@ from collections import OrderedDict
 from matplotlib import pyplot as plt
 import copy
 
+
 cfg = {
     'VGG5' : [64, 'A', 128, 128, 'A'],
     'VGG9':  [64, 'A', 128, 256, 'A', 256, 512, 'A', 512, 'A', 512],
-    'VGG11': [64, 'A', 128, 256, 256, 'A', 512, 512, 512, 'A', 512, 512],
+    'VGG11': [64, 'A', 128, 256, 'A', 512, 512, 'A', 512, 'A', 512, 512],
     'VGG13': [64, 64, 'A', 128, 128, 'A', 256, 256, 'A', 512, 512, 512, 'A', 512],
     'VGG16': [64, 64, 'A', 128, 128, 'A', 256, 256, 256, 'A', 512, 512, 512, 'A', 512, 512, 512],
     'VGG19': [64, 64, 'A', 128, 128, 'A', 256, 256, 256, 256, 'A', 512, 512, 512, 512, 'A', 512, 512, 512, 512]
@@ -28,6 +29,27 @@ class PoissonGenerator(nn.Module):
 		
 		out = torch.mul(torch.le(torch.rand_like(input), torch.abs(input)*1.0).float(),torch.sign(input))
 		return out
+
+class STDPSpike(torch.autograd.Function):
+
+	alpha 	= ''
+	beta 	= ''
+    
+	@staticmethod
+	def forward(ctx, input, last_spike):
+        
+		ctx.save_for_backward(last_spike)
+		out = torch.zeros_like(input).cuda()
+		out[input > 0] = 1.0
+		return out
+
+	@staticmethod
+	def backward(ctx, grad_output):
+	    		
+		last_spike, = ctx.saved_tensors
+		grad_input = grad_output.clone()
+		grad = STDB.alpha * torch.exp(-1*last_spike)**STDB.beta
+		return grad*grad_input, None
 
 class STDB(torch.autograd.Function):
 
@@ -167,23 +189,14 @@ class VGG_SNN_STDB(nn.Module):
 		features = nn.Sequential(*layers)
 		
 		layers = []
-		if self.vgg_name == 'VGG11' and self.dataset=='CIFAR100':
-			layers += [nn.Linear(512*4*4, 1024, bias=False)]
+		if self.vgg_name == 'VGG5' and self.dataset != 'MNIST':
+			layers += [nn.Linear(512*4*4, 4096, bias=False)]
 			layers += [nn.ReLU(inplace=True)]
 			layers += [nn.Dropout(0.5)]
-			layers += [nn.Linear(1024, 1024, bias=False)]
+			layers += [nn.Linear(4096, 4096, bias=False)]
 			layers += [nn.ReLU(inplace=True)]
 			layers += [nn.Dropout(0.5)]
-			layers += [nn.Linear(1024, self.labels, bias=False)]
-
-		elif self.vgg_name == 'VGG5' and self.dataset != 'MNIST':
-			layers += [nn.Linear(512*4*4, 1024, bias=False)]
-			layers += [nn.ReLU(inplace=True)]
-			layers += [nn.Dropout(0.5)]
-			layers += [nn.Linear(1024, 1024, bias=False)]
-			layers += [nn.ReLU(inplace=True)]
-			layers += [nn.Dropout(0.5)]
-			layers += [nn.Linear(1024, self.labels, bias=False)]
+			layers += [nn.Linear(4096, self.labels, bias=False)]
 		
 		elif self.vgg_name != 'VGG5' and self.dataset != 'MNIST':
 			layers += [nn.Linear(512*2*2, 4096, bias=False)]
