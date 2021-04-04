@@ -14,7 +14,7 @@ import copy
 cfg = {
     'VGG5' : [64, 'A', 128, 128, 'A'],
     'VGG9':  [64, 'A', 128, 256, 'A', 256, 512, 'A', 512, 'A', 512],
-    'VGG11': [64, 'A', 128, 256, 256, 'A', 512, 512, 512, 'A', 512, 512],
+    'VGG11': [64, 'A', 128, 256, 'A', 512, 512, 'A', 512, 'A', 512, 512],
     'VGG13': [64, 64, 'A', 128, 128, 'A', 256, 256, 'A', 512, 512, 512, 'A', 512],
     'VGG16': [64, 64, 'A', 128, 128, 'A', 256, 256, 256, 'A', 512, 512, 512, 'A', 512, 512, 512],
     'VGG19': [64, 64, 'A', 128, 128, 'A', 256, 256, 256, 256, 'A', 512, 512, 512, 512, 'A', 512, 512, 512, 512]
@@ -118,7 +118,9 @@ class VGG_SNN_STDB(nn.Module):
 				m.weight.data.normal_(0, math.sqrt(2. / n))
 				if m.bias is not None:
 					m.bias.data.zero_()
-			
+			elif isinstance(m, nn.BatchNorm2d):
+				m.weight.data.fill_(1)
+				m.bias.data.zero_()
 			elif isinstance(m, nn.Linear):
 				n = m.weight.size(1)
 				m.weight.data.normal_(0, 0.01)
@@ -134,14 +136,15 @@ class VGG_SNN_STDB(nn.Module):
 			if isinstance(self.features[pos], nn.Conv2d):
 				if thresholds:
 					self.threshold[pos] = torch.tensor(thresholds.pop(0)*self.scaling_factor)
-		
+				#print('\t Layer{} : {:.2f}'.format(pos, self.threshold[pos]))
+
 		prev = len(self.features)
 
 		for pos in range(len(self.classifier)-1):
 			if isinstance(self.classifier[pos], nn.Linear):
 				if thresholds:
 					self.threshold[prev+pos] = torch.tensor(thresholds.pop(0)*self.scaling_factor)
-				
+				#print('\t Layer{} : {:.2f}'.format(prev+pos, self.threshold[prev+pos]))
 
 	def _make_layers(self, cfg):
 		layers 		= []
@@ -167,23 +170,14 @@ class VGG_SNN_STDB(nn.Module):
 		features = nn.Sequential(*layers)
 		
 		layers = []
-		if self.vgg_name == 'VGG11' and self.dataset=='CIFAR100':
-			layers += [nn.Linear(512*4*4, 1024, bias=False)]
+		if self.vgg_name == 'VGG5' and self.dataset != 'MNIST':
+			layers += [nn.Linear(512*4*4, 4096, bias=False)]
 			layers += [nn.ReLU(inplace=True)]
 			layers += [nn.Dropout(0.5)]
-			layers += [nn.Linear(1024, 1024, bias=False)]
+			layers += [nn.Linear(4096, 4096, bias=False)]
 			layers += [nn.ReLU(inplace=True)]
 			layers += [nn.Dropout(0.5)]
-			layers += [nn.Linear(1024, self.labels, bias=False)]
-
-		elif self.vgg_name == 'VGG5' and self.dataset != 'MNIST':
-			layers += [nn.Linear(512*4*4, 1024, bias=False)]
-			layers += [nn.ReLU(inplace=True)]
-			layers += [nn.Dropout(0.5)]
-			layers += [nn.Linear(1024, 1024, bias=False)]
-			layers += [nn.ReLU(inplace=True)]
-			layers += [nn.Dropout(0.5)]
-			layers += [nn.Linear(1024, self.labels, bias=False)]
+			layers += [nn.Linear(4096, self.labels, bias=False)]
 		
 		elif self.vgg_name != 'VGG5' and self.dataset != 'MNIST':
 			layers += [nn.Linear(512*2*2, 4096, bias=False)]
@@ -223,7 +217,11 @@ class VGG_SNN_STDB(nn.Module):
 	def neuron_init(self, x):
 		self.batch_size = x.size(0)
 		self.width 		= x.size(2)
-		self.height 	= x.size(3)			
+		self.height 	= x.size(3)
+
+		self.mem 		= {}
+		self.mask 		= {}
+		self.spike 		= {}			
 				
 		for l in range(len(self.features)):
 								
