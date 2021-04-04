@@ -14,7 +14,7 @@ import copy
 cfg = {
     'VGG5' : [64, 'A', 128, 128, 'A'],
     'VGG9':  [64, 'A', 128, 256, 'A', 256, 512, 'A', 512, 'A', 512],
-    'VGG11': [64, 'A', 128, 256, 'A', 512, 512, 'A', 512, 'A', 512, 512],
+    'VGG11': [64, 'A', 128, 256, 256, 'A', 512, 512, 512, 'A', 512, 512],
     'VGG13': [64, 64, 'A', 128, 128, 'A', 256, 256, 'A', 512, 512, 512, 'A', 512],
     'VGG16': [64, 64, 'A', 128, 128, 'A', 256, 256, 256, 'A', 512, 512, 512, 'A', 512, 512, 512],
     'VGG19': [64, 64, 'A', 128, 128, 'A', 256, 256, 256, 256, 'A', 512, 512, 512, 512, 'A', 512, 512, 512, 512]
@@ -170,7 +170,15 @@ class VGG_SNN_STDB(nn.Module):
 		features = nn.Sequential(*layers)
 		
 		layers = []
-		if self.vgg_name == 'VGG5' and self.dataset != 'MNIST':
+		if self.vgg_name == 'VGG11' and self.dataset == 'CIFAR100':
+			layers += [nn.Linear(8192, 1024, bias=False)]
+			layers += [nn.ReLU(inplace=True)]
+			layers += [nn.Dropout(0.5)]
+			layers += [nn.Linear(1024, 1024, bias=False)]
+			layers += [nn.ReLU(inplace=True)]
+			layers += [nn.Dropout(0.5)]
+			layers += [nn.Linear(1024, self.labels, bias=False)]
+		elif self.vgg_name == 'VGG5' and self.dataset != 'MNIST':
 			layers += [nn.Linear(512*4*4, 4096, bias=False)]
 			layers += [nn.ReLU(inplace=True)]
 			layers += [nn.Dropout(0.5)]
@@ -205,7 +213,7 @@ class VGG_SNN_STDB(nn.Module):
 			layers += [nn.ReLU(inplace=True)]
 			layers += [nn.Dropout(0.5)]
 			layers += [nn.Linear(4096, self.labels, bias=False)]
-
+	
 
 		classifer = nn.Sequential(*layers)
 		return (features, classifer)
@@ -299,6 +307,7 @@ class VGG_SNN_STDB(nn.Module):
 					out 				= self.act_func(mem_thr, (t-1-self.spike[prev+l]))
 					rst 				= self.threshold[prev+l] * (mem_thr>0).float()
 					self.spike[prev+l] 	= self.spike[prev+l].masked_fill(out.bool(),t-1)
+					
 					self.mem[prev+l] 	= self.leak*self.mem[prev+l] + self.classifier[l](out_prev) - rst
 					out_prev  		= out.clone()
 

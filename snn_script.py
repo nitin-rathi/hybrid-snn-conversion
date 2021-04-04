@@ -15,14 +15,14 @@ from scipy.special import comb
 #So for samll timesteps the scaling_factor should be small
 #For timesteps above 100 scaling_factor of 0.6-0.8 can be used
 
-pretrained_ann = './trained_models/ann/ann_resnet12_cifar10.pth'
+pretrained_ann = './trained_models/ann/ann_vgg11_cifar100.pth'
 hyperparameters = {
-	'architecture'	:	{'RESNET12'},
+	'architecture'	:	{'VGG11'},
 	'learning_rate'	:	{'1e-4'},
 	'epochs'		:	{'50'},
 	'lr_interval'	:	{'\'0.60 0.80 0.90\''},
 	'lr_reduce'		: 	{'5'},
-	'dataset'		:	{'CIFAR10'},
+	'dataset'		:	{'CIFAR100'},
 	'batch_size'	:	{'64'},
 	'optimizer' 	: 	{'Adam'},
 	'timesteps'		: 	{'50'},

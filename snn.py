@@ -48,7 +48,14 @@ class AverageMeter(object):
 def find_threshold(batch_size=512, timesteps=2500, architecture='VGG16'):
     
     loader = torch.utils.data.DataLoader(dataset=trainset, batch_size=batch_size, shuffle=True)
-    model.module.network_update(timesteps=timesteps, leak=1.0)
+    
+    try:
+        obj = model.module
+    except AttributeError:
+        obj = model
+    
+    obj.network_update(timesteps=timesteps, leak=1.0)
+    
 
     pos=0
     thresholds=[]
@@ -73,18 +80,18 @@ def find_threshold(batch_size=512, timesteps=2500, architecture='VGG16'):
                     thresholds.append(max_act)
                     pos = pos+1
                     f.write(' {}'.format(thresholds))
-                    model.module.threshold_update(scaling_factor=1.0, thresholds=thresholds[:])
+                    obj.threshold_update(scaling_factor=1.0, thresholds=thresholds[:])
                     break
         return pos
 
     if architecture.lower().startswith('vgg'):              
-        for l in model.module.features.named_children():
+        for l in obj.features.named_children():
             if isinstance(l[1], nn.Conv2d):
                 pos = find(int(l[0]), pos)
         
-        for c in model.module.classifier.named_children():
+        for c in obj.classifier.named_children():
             if isinstance(c[1], nn.Linear):
-                if (int(l[0])+int(c[0])+1) == (len(model.module.features) + len(model.module.classifier) -1):
+                if (int(l[0])+int(c[0])+1) == (len(obj.features) + len(obj.classifier) -1):
                     pass
                 else:
                     pos = find(int(l[0])+int(c[0])+1, pos)
@@ -258,7 +265,7 @@ if __name__ == '__main__':
     parser.add_argument('--dropout',                default=0.3,                type=float,     help='dropout percentage for conv layers')
     parser.add_argument('--kernel_size',            default=3,                  type=int,       help='filter size for the conv layers')
     parser.add_argument('--test_acc_every_batch',   action='store_true',                        help='print acc of every batch during inference')
-    parser.add_argument('--train_acc_batches',      default=20,                type=int,       help='print training progress after this many batches')
+    parser.add_argument('--train_acc_batches',      default=200,                type=int,       help='print training progress after this many batches')
     parser.add_argument('--devices',                default='0',                type=str,       help='list of gpu device(s)')
 
     args = parser.parse_args()
@@ -430,10 +437,16 @@ if __name__ == '__main__':
         if 'thresholds' in state.keys():
             thresholds = state['thresholds']
             f.write('\n Info: Thresholds loaded from trained ANN: {}'.format(thresholds))
-            model.module.threshold_update(scaling_factor = scaling_factor, thresholds=thresholds[:])
+            try :
+                model.module.threshold_update(scaling_factor = scaling_factor, thresholds=thresholds[:])
+            except AttributeError:
+                model.threshold_update(scaling_factor = scaling_factor, thresholds=thresholds[:])
         else:
             thresholds = find_threshold(batch_size=512, timesteps=1000, architecture=architecture)
-            model.module.threshold_update(scaling_factor = scaling_factor, thresholds=thresholds[:])
+            try:
+                model.module.threshold_update(scaling_factor = scaling_factor, thresholds=thresholds[:])
+            except AttributeError:
+                model.threshold_update(scaling_factor = scaling_factor, thresholds=thresholds[:])
             
             #Save the threhsolds in the ANN file
             temp = {}
@@ -445,7 +458,6 @@ if __name__ == '__main__':
     if pretrained_snn:
                 
         state = torch.load(pretrained_snn, map_location='cpu')
-        
         cur_dict = model.state_dict()     
         for key in state['state_dict'].keys():
             
